@@ -133,12 +133,12 @@ export default function AiSummary() {
 
   const providerTag = () => {
     if (localOnly) {
-      return <Tag severity="contrast" value="Modo local activo" icon="pi pi-desktop" />;
+      return <Tag severity="info" value="Modo local activo" icon="pi pi-desktop" />;
     }
     if (!provider) {
       return (
         <Link href="/settings">
-          <Tag severity="secondary" value="Configurar IA" icon="pi pi-cog" style={{ cursor: 'pointer' }} />
+          <Tag severity="info" value="Configurar IA" icon="pi pi-cog" style={{ cursor: 'pointer' }} />
         </Link>
       );
     }
@@ -230,7 +230,7 @@ export default function AiSummary() {
             </div>
             {result.provider
               ? <Tag severity={result.provider === 'openai' ? 'success' : 'warning'} value={PROVIDER_LABELS[result.provider]} icon="pi pi-sparkles" />
-              : <Tag severity="secondary" value="Análisis local" />
+              : <Tag severity="info" value="Análisis local" />
             }
           </div>
 

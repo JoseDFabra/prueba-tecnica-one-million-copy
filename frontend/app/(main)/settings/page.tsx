@@ -152,7 +152,7 @@ export default function SettingsPage() {
     if (status === 'valid') return <Tag severity="success" value="Válida" icon="pi pi-check" />;
     if (status === 'invalid') return <Tag severity="danger" value="Inválida" icon="pi pi-times" />;
     if (status === 'testing') return <Tag severity="warning" value="Verificando..." />;
-    return <Tag severity="secondary" value="Sin configurar" />;
+    return <Tag severity="info" value="Sin configurar" />;
   };
 
   return (
@@ -178,7 +178,7 @@ export default function SettingsPage() {
             <div className="flex align-items-center gap-2">
               <span className="text-700 text-sm">Desactivar agentes (modo local)</span>
               <InputSwitch checked={localOnly} onChange={(e) => handleLocalOnlyToggle(!!e.value)} />
-              {localOnly && <Tag severity="contrast" value="Local" />}
+              {localOnly && <Tag severity="info" value="Local" />}
             </div>
           </div>
           <div className="flex gap-4">
@@ -300,7 +300,7 @@ export default function SettingsPage() {
           <h5 className="mb-3">¿Cómo funciona?</h5>
           <ul className="m-0 pl-3 line-height-3 text-700">
             <li className="mb-2">Puedes guardar keys de <strong>ambos proveedores</strong> y cambiar entre ellos sin perder la configuración.</li>
-            <li className="mb-2">El provider marcado como <strong>Activo</strong> es el que usa el botón "Generar con IA" del Dashboard.</li>
+            <li className="mb-2">El provider marcado como <strong>Activo</strong> es el que usa el boton &quot;Generar con IA&quot; del Dashboard.</li>
             <li className="mb-2">Si activas <strong>modo local</strong>, el Dashboard ignora temporalmente OpenAI/Claude y responde con análisis local.</li>
             <li className="mb-2">Las keys se envían como headers a una API route de Next.js (<code className="surface-100 border-round px-1">/api/ai-summary</code>) que actúa como proxy — <strong>nunca quedan expuestas en el bundle del cliente</strong>.</li>
             <li className="mb-2">Sin ningún provider configurado, el Dashboard genera un análisis local con la misma estructura.</li>

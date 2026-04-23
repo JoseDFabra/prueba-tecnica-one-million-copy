@@ -1,6 +1,36 @@
 import { Lead, LeadFilters, LeadsResponse, LeadStats } from '../types/lead';
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
+function resolveBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+  const appEnv = process.env.NEXT_PUBLIC_APP_ENV?.trim().toLowerCase();
+
+  if (configured) {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      const isPublicHost = hostname !== 'localhost' && hostname !== '127.0.0.1';
+      const pointsToLocalhost = configured.includes('localhost') || configured.includes('127.0.0.1');
+      const shouldForcePublicHost = appEnv === 'prod' || appEnv === 'production';
+
+      // If the bundle was built with localhost but user opens app via public IP/domain,
+      // switch to current host so API requests don't target the visitor's own machine.
+      if ((pointsToLocalhost && isPublicHost) || shouldForcePublicHost) {
+        return `${window.location.protocol}//${hostname}:3001/api`;
+      }
+    }
+
+    return configured;
+  }
+
+  // Fallback runtime for deployed environments without build arg:
+  // use current host and point to backend port 3001.
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.hostname}:3001/api`;
+  }
+
+  return 'http://localhost:3001/api';
+}
+
+const BASE = resolveBaseUrl();
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
