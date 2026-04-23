@@ -1,0 +1,17 @@
+{
+  "name": "pt-one-million-copy",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "dev:apps": "concurrently -k -n BACKEND,FRONTEND -c blue,green \"PORT=3001 npm run start:dev -w backend\" \"npm run dev -w frontend\"",
+    "dev": "npm run docker:up && npm run dev:apps"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

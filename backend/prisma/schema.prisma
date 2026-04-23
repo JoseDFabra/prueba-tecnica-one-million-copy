@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum LeadSource {
+  instagram
+  facebook
+  landing_page
+  referido
+  otro
+}
+
+model Lead {
+  id               String     @id @default(uuid())
+  nombre           String
+  email            String     @unique
+  telefono         String?
+  fuente           LeadSource
+  producto_interes String?
+  presupuesto      Float?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
