@@ -13,7 +13,7 @@ import { Sidebar } from 'primereact/sidebar';
 import { Paginator } from 'primereact/paginator';
 import { Nullable } from 'primereact/ts-helpers';
 import { useLeads } from '../../hooks/useLeads';
-import { Lead, SOURCE_OPTIONS, SOURCE_LABELS } from '../../types/lead';
+import { Lead, LeadSource, SOURCE_OPTIONS, SOURCE_LABELS } from '../../types/lead';
 import { leadsApi } from '../../services/leadsApi';
 import LeadForm from '../../components/leads/LeadForm';
 import SourceBadge from '../../components/leads/SourceBadge';
@@ -24,7 +24,7 @@ export default function LeadsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [fuente, setFuente] = useState<string | undefined>();
+  const [fuente, setFuente] = useState<LeadSource | 'all'>('all');
   const [fechaDesde, setFechaDesde] = useState<Nullable<Date>>(null);
   const [fechaHasta, setFechaHasta] = useState<Nullable<Date>>(null);
 
@@ -36,7 +36,7 @@ export default function LeadsPage() {
   const { leads, total, totalPages, loading, error, refresh } = useLeads({
     page,
     search,
-    fuente: fuente as any,
+    fuente: fuente === 'all' ? undefined : fuente,
     fechaDesde: fechaDesde?.toISOString().split('T')[0],
     fechaHasta: fechaHasta?.toISOString().split('T')[0],
     limit: 10,
@@ -53,7 +53,7 @@ export default function LeadsPage() {
   const handleClearFilters = () => {
     setSearch('');
     setSearchInput('');
-    setFuente(undefined);
+    setFuente('all');
     setFechaDesde(null);
     setFechaHasta(null);
     setPage(1);
@@ -151,8 +151,8 @@ export default function LeadsPage() {
 
             <Dropdown
               value={fuente}
-              options={[{ label: 'Todas las fuentes', value: undefined }, ...SOURCE_OPTIONS]}
-              onChange={(e) => { setFuente(e.value); setPage(1); }}
+              options={[{ label: 'Todas las fuentes', value: 'all' as const }, ...SOURCE_OPTIONS]}
+              onChange={(e) => { setFuente(e.value as LeadSource | 'all'); setPage(1); }}
               placeholder="Fuente"
               className="w-12rem"
             />

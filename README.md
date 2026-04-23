@@ -21,28 +21,25 @@ Aplicación full stack para gestión de leads de One Million Copy SAS.
 # 1. Instalar dependencias (desde la raíz del proyecto)
 npm install
 
-# 2. Configurar variables de entorno
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env.local
-
-# 3. Levantar todo (Postgres + backend + frontend)
+# 2. Levantar todo con un solo comando
 npm run dev
 ```
 
 El comando `npm run dev`:
 - Levanta PostgreSQL en Docker (`localhost:5432`)
+- Crea `backend/.env` y `frontend/.env.local` si no existen
+- Ejecuta migraciones de Prisma
+- Libera el puerto `3001` si estaba ocupado
 - Inicia el backend NestJS en `http://localhost:3001`
 - Inicia el frontend Next.js en `http://localhost:3000`
 
-## Migración y seed (primer arranque)
+## Seed de datos (por separado)
 
 ```bash
-# Correr migración
-cd backend && npx prisma migrate dev
-
-# Poblar la base de datos con 15 leads de ejemplo
-npm run seed
+npm run seed --prefix backend
 ```
+
+Este comando carga 15 leads de ejemplo en la base de datos local.
 
 ## Funcionalidades
 
