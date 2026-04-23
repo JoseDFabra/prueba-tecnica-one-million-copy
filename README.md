@@ -91,4 +91,4 @@ npm run docker:up     # Iniciar Postgres
 - **PrimeReact**: ya incluido en el template base, componentes robustos (DataTable, Dialog, Sidebar, Toast, ConfirmDialog)
 - **React Hook Form**: manejo de formularios con validación nativa, sin dependencias adicionales problemáticas
 - **Prisma v7**: requiere Driver Adapter (`@prisma/adapter-pg`) en lugar del `datasource url` tradicional
-- **AI Summary**: implementado con lógica local sobre datos reales de la API; documentado en el componente. Se conectaría a un LLM real pasando el resumen de stats como contexto
+- **AI Summary**: conectado a LLM real vía API route de Next.js (`/api/ai-summary`), usando datos reales de la API como contexto y fallback local ante errores o cuando no hay provider activo
