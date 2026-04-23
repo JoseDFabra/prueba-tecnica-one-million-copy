@@ -9,14 +9,7 @@ import { Nullable } from 'primereact/ts-helpers';
 import Link from 'next/link';
 import { leadsApi } from '../../services/leadsApi';
 import { LeadSource, SOURCE_OPTIONS, SOURCE_LABELS } from '../../types/lead';
-
-type Provider = 'openai' | 'claude';
-
-const STORAGE = {
-  active: 'omc_ai_provider',
-  openai: 'omc_openai_key',
-  claude: 'omc_claude_key',
-} as const;
+import { AI_PREFS_EVENT, Provider, getAiPreferences } from '../../lib/aiPreferences';
 
 const PROVIDER_LABELS: Record<Provider, string> = {
   openai: 'gpt-4o-mini',
@@ -64,6 +57,7 @@ function localSummary(
 export default function AiSummary() {
   const [provider, setProvider] = useState<Provider | null>(null);
   const [apiKey, setApiKey] = useState('');
+  const [localOnly, setLocalOnly] = useState(false);
   const [fuente, setFuente] = useState<LeadSource | undefined>();
   const [fechaDesde, setFechaDesde] = useState<Nullable<Date>>(null);
   const [fechaHasta, setFechaHasta] = useState<Nullable<Date>>(null);
@@ -72,17 +66,28 @@ export default function AiSummary() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    const active = localStorage.getItem(STORAGE.active) as Provider | null;
-    if (active) {
-      const key = localStorage.getItem(STORAGE[active]) ?? '';
-      if (key) {
-        setProvider(active);
-        setApiKey(key);
+    const syncPreferences = () => {
+      const prefs = getAiPreferences();
+      setLocalOnly(prefs.localOnly);
+
+      if (!prefs.localOnly && prefs.activeProvider && prefs.key) {
+        setProvider(prefs.activeProvider);
+        setApiKey(prefs.key);
         return;
       }
-    }
-    setProvider(null);
-    setApiKey('');
+
+      setProvider(null);
+      setApiKey('');
+    };
+
+    syncPreferences();
+    window.addEventListener(AI_PREFS_EVENT, syncPreferences);
+    window.addEventListener('focus', syncPreferences);
+
+    return () => {
+      window.removeEventListener(AI_PREFS_EVENT, syncPreferences);
+      window.removeEventListener('focus', syncPreferences);
+    };
   }, []);
 
   const handleGenerate = async () => {
@@ -92,7 +97,7 @@ export default function AiSummary() {
     try {
       const stats = await leadsApi.getStats();
 
-      if (provider && apiKey) {
+      if (!localOnly && provider && apiKey) {
         const res = await fetch('/api/ai-summary', {
           method: 'POST',
           headers: {
@@ -127,6 +132,9 @@ export default function AiSummary() {
   };
 
   const providerTag = () => {
+    if (localOnly) {
+      return <Tag severity="contrast" value="Modo local activo" icon="pi pi-desktop" />;
+    }
     if (!provider) {
       return (
         <Link href="/settings">
@@ -148,7 +156,7 @@ export default function AiSummary() {
         {providerTag()}
       </div>
       <p className="text-500 text-sm mt-1 mb-4">
-        {provider
+        {!localOnly && provider
           ? `Genera un análisis ejecutivo con ${PROVIDER_LABELS[provider]} usando tus datos reales.`
           : 'Genera un análisis local o conecta un proveedor de IA en Configuración.'}
       </p>
@@ -179,8 +187,8 @@ export default function AiSummary() {
           className="w-10rem"
         />
         <Button
-          label={provider ? 'Generar con IA' : 'Generar resumen'}
-          icon={provider ? 'pi pi-sparkles' : 'pi pi-chart-bar'}
+          label={!localOnly && provider ? 'Generar con IA' : 'Generar resumen'}
+          icon={!localOnly && provider ? 'pi pi-sparkles' : 'pi pi-chart-bar'}
           onClick={handleGenerate}
           loading={loading}
           className="p-button-outlined"

@@ -5,15 +5,10 @@ import { Button } from 'primereact/button';
 import { Toast } from 'primereact/toast';
 import { Tag } from 'primereact/tag';
 import { RadioButton } from 'primereact/radiobutton';
+import { InputSwitch } from 'primereact/inputswitch';
+import { AI_KEYS as KEYS, Provider, getAiPreferences, notifyAiPrefsUpdated } from '../../lib/aiPreferences';
 
-type Provider = 'openai' | 'claude';
 type KeyStatus = 'idle' | 'testing' | 'valid' | 'invalid';
-
-const KEYS = {
-  openai: 'omc_openai_key',
-  claude: 'omc_claude_key',
-  active: 'omc_ai_provider',
-} as const;
 
 const PROVIDERS = [
   {
@@ -52,14 +47,16 @@ function mask(k: string) {
 export default function SettingsPage() {
   const toast = useRef<Toast>(null);
   const [activeProvider, setActiveProvider] = useState<Provider>('openai');
+  const [localOnly, setLocalOnly] = useState(false);
   const [state, setState] = useState<Record<Provider, ProviderState>>({
     openai: { key: '', savedKey: '', showKey: false, status: 'idle' },
     claude: { key: '', savedKey: '', showKey: false, status: 'idle' },
   });
 
   useEffect(() => {
-    const active = (localStorage.getItem(KEYS.active) as Provider) ?? 'openai';
-    setActiveProvider(active);
+    const prefs = getAiPreferences();
+    setActiveProvider(prefs.activeProvider ?? 'openai');
+    setLocalOnly(prefs.localOnly);
 
     setState((prev) => {
       const next = { ...prev };
@@ -82,6 +79,7 @@ export default function SettingsPage() {
       return;
     }
     localStorage.setItem(KEYS[provider], trimmed);
+    notifyAiPrefsUpdated();
     update(provider, { savedKey: trimmed, status: 'valid' });
     toast.current?.show({ severity: 'success', summary: 'Guardado', detail: 'API key guardada correctamente', life: 3000 });
   };
@@ -112,12 +110,14 @@ export default function SettingsPage() {
 
   const handleClear = (provider: Provider) => {
     localStorage.removeItem(KEYS[provider]);
+    notifyAiPrefsUpdated();
     update(provider, { key: '', savedKey: '', status: 'idle' });
     if (activeProvider === provider) {
       const other = provider === 'openai' ? 'claude' : 'openai';
       if (state[other].savedKey) {
         setActiveProvider(other);
         localStorage.setItem(KEYS.active, other);
+        notifyAiPrefsUpdated();
       }
     }
     toast.current?.show({ severity: 'info', summary: 'API key eliminada', detail: 'Clave removida correctamente', life: 3000 });
@@ -130,7 +130,22 @@ export default function SettingsPage() {
     }
     setActiveProvider(provider);
     localStorage.setItem(KEYS.active, provider);
+    notifyAiPrefsUpdated();
     toast.current?.show({ severity: 'success', summary: 'Provider actualizado', detail: `Usando ${provider === 'openai' ? 'OpenAI' : 'Claude'} para el resumen`, life: 3000 });
+  };
+
+  const handleLocalOnlyToggle = (enabled: boolean) => {
+    setLocalOnly(enabled);
+    localStorage.setItem(KEYS.localOnly, enabled ? 'true' : 'false');
+    notifyAiPrefsUpdated();
+    toast.current?.show({
+      severity: enabled ? 'info' : 'success',
+      summary: enabled ? 'Modo local activado' : 'Agentes activados',
+      detail: enabled
+        ? 'El Dashboard responderá con análisis local.'
+        : 'El Dashboard volverá a usar el proveedor activo cuando tenga key.',
+      life: 3500,
+    });
   };
 
   const statusTag = (status: KeyStatus) => {
@@ -158,7 +173,14 @@ export default function SettingsPage() {
       {/* Provider activo */}
       <div className="col-12 mb-2">
         <div className="card mb-0">
-          <span className="font-medium text-900 block mb-3">Provider activo para el resumen</span>
+          <div className="flex align-items-center justify-content-between mb-3 flex-wrap gap-3">
+            <span className="font-medium text-900">Provider activo para el resumen</span>
+            <div className="flex align-items-center gap-2">
+              <span className="text-700 text-sm">Desactivar agentes (modo local)</span>
+              <InputSwitch checked={localOnly} onChange={(e) => handleLocalOnlyToggle(!!e.value)} />
+              {localOnly && <Tag severity="contrast" value="Local" />}
+            </div>
+          </div>
           <div className="flex gap-4">
             {PROVIDERS.map((p) => (
               <div key={p.id} className="flex align-items-center gap-2">
@@ -279,6 +301,7 @@ export default function SettingsPage() {
           <ul className="m-0 pl-3 line-height-3 text-700">
             <li className="mb-2">Puedes guardar keys de <strong>ambos proveedores</strong> y cambiar entre ellos sin perder la configuración.</li>
             <li className="mb-2">El provider marcado como <strong>Activo</strong> es el que usa el botón "Generar con IA" del Dashboard.</li>
+            <li className="mb-2">Si activas <strong>modo local</strong>, el Dashboard ignora temporalmente OpenAI/Claude y responde con análisis local.</li>
             <li className="mb-2">Las keys se envían como headers a una API route de Next.js (<code className="surface-100 border-round px-1">/api/ai-summary</code>) que actúa como proxy — <strong>nunca quedan expuestas en el bundle del cliente</strong>.</li>
             <li className="mb-2">Sin ningún provider configurado, el Dashboard genera un análisis local con la misma estructura.</li>
             <li>Modelos usados: <strong>gpt-4o-mini</strong> (OpenAI) · <strong>claude-haiku-4-5</strong> (Anthropic) — rápidos y económicos para esta tarea.</li>
