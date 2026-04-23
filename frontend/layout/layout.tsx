@@ -103,9 +103,6 @@ const Layout = ({ children }: ChildContainerProps) => {
             </div>
             <div className="layout-main-container">
                 <div className="layout-main">{children}</div>
-                <div className="layout-footer">
-                    <span className="text-500 text-sm">OMC Leads &copy; {new Date().getFullYear()} — One Million Copy SAS</span>
-                </div>
             </div>
             <div className="layout-mask" />
         </div>
