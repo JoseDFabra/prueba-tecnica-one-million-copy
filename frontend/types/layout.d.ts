@@ -1,25 +1,5 @@
-import React, { ReactElement, Dispatch, SetStateAction, HTMLAttributeAnchorTarget, ReactNode } from 'react';
-import { NextPage } from 'next';
-import { Demo } from './demo';
-import { Toast } from 'primereact/toast';
+import React, { Dispatch, SetStateAction, HTMLAttributeAnchorTarget, ReactNode } from 'react';
 
-/* Breadcrumb Types */
-export interface AppBreadcrumbProps {
-    className?: string;
-}
-
-export interface Breadcrumb {
-    labels?: string[];
-    to?: string;
-}
-
-export interface BreadcrumbItem {
-    label: string;
-    to?: string;
-    items?: BreadcrumbItem[];
-}
-
-/* Context Types */
 export type LayoutState = {
     staticMenuDesktopInactive: boolean;
     overlayMenuActive: boolean;
@@ -52,41 +32,25 @@ export interface MenuContextProps {
     setActiveMenu: Dispatch<SetStateAction<string>>;
 }
 
-/* AppConfig Types */
-export interface AppConfigProps {
-    simple?: boolean;
-}
-
-/* AppTopbar Types */
-export type NodeRef = MutableRefObject<ReactNode>;
 export interface AppTopbarRef {
     menubutton?: HTMLButtonElement | null;
     topbarmenu?: HTMLDivElement | null;
     topbarmenubutton?: HTMLButtonElement | null;
 }
 
-/* AppMenu Types */
 type CommandProps = {
     originalEvent: React.MouseEvent<HTMLAnchorElement, MouseEvent>;
     item: MenuModelItem;
 };
 
-export interface MenuProps {
-    model: MenuModel[];
-}
-
-export interface MenuModel {
-    label: string;
+export interface AppMenuItem {
+    label?: string;
     icon?: string;
-    items?: MenuModel[];
+    items?: AppMenuItem[];
     to?: string;
     url?: string;
     target?: HTMLAttributeAnchorTarget;
     seperator?: boolean;
-}
-
-export interface AppMenuItem extends MenuModel {
-    items?: AppMenuItem[];
     badge?: 'UPDATED' | 'NEW';
     badgeClass?: string;
     class?: string;
@@ -104,3 +68,7 @@ export interface AppMenuItemProps {
     root?: boolean;
     className?: string;
 }
+
+export type ChildContainerProps = {
+    children: ReactNode;
+};
