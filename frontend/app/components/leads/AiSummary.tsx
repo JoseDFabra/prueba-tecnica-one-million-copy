@@ -10,73 +10,59 @@ import Link from 'next/link';
 import { leadsApi } from '../../services/leadsApi';
 import { LeadSource, SOURCE_OPTIONS, SOURCE_LABELS } from '../../types/lead';
 
-const STORAGE_KEY = 'omc_openai_key';
+type Provider = 'openai' | 'claude';
+
+const STORAGE = {
+  active: 'omc_ai_provider',
+  openai: 'omc_openai_key',
+  claude: 'omc_claude_key',
+} as const;
+
+const PROVIDER_LABELS: Record<Provider, string> = {
+  openai: 'gpt-4o-mini',
+  claude: 'claude-haiku-4-5',
+};
 
 interface SummaryResult {
   analisisGeneral: string;
   fuentePrincipal: string;
   recomendaciones: string[];
   totalAnalizados: number;
-  usedAI?: boolean;
+  provider?: Provider;
 }
 
 function localSummary(
   stats: Awaited<ReturnType<typeof leadsApi.getStats>>,
   fuente?: LeadSource,
 ): SummaryResult {
-  const top = stats.bySource.sort((a, b) => b.count - a.count)[0];
+  const top = [...stats.bySource].sort((a, b) => b.count - a.count)[0];
   const fuenteLabel = top ? SOURCE_LABELS[top.fuente] : 'sin datos';
-  const avgFormatted = `$${Math.round(stats.avgBudget).toLocaleString('en-US')}`;
-  const focusedSource = fuente ? SOURCE_LABELS[fuente] : null;
+  const avg = `$${Math.round(stats.avgBudget).toLocaleString('en-US')}`;
+  const src = fuente ? SOURCE_LABELS[fuente] : null;
 
   return {
     totalAnalizados: stats.total,
     fuentePrincipal: fuenteLabel,
-    usedAI: false,
-    analisisGeneral: focusedSource
-      ? `La base de leads filtrada por ${focusedSource} muestra un comportamiento específico dentro del embudo. Con un presupuesto promedio general de ${avgFormatted} USD, este segmento representa una oportunidad de conversión directa. Los ${stats.last7Days} leads recientes de los últimos 7 días indican actividad continua en los canales de adquisición.`
-      : `La base actual cuenta con ${stats.total} leads distribuidos en ${stats.bySource.length} fuentes de adquisición. El presupuesto promedio es de ${avgFormatted} USD, lo que indica un perfil de cliente con capacidad de inversión moderada-alta. Se registraron ${stats.last7Days} nuevos leads en los últimos 7 días, reflejando actividad sostenida en los embudos.`,
-    recomendaciones: focusedSource
+    analisisGeneral: src
+      ? `La base de leads filtrada por ${src} muestra un comportamiento específico dentro del embudo. Con un presupuesto promedio general de ${avg} USD, este segmento representa una oportunidad de conversión directa. Los ${stats.last7Days} leads recientes de los últimos 7 días indican actividad continua en los canales de adquisición.`
+      : `La base actual cuenta con ${stats.total} leads distribuidos en ${stats.bySource.length} fuentes de adquisición. El presupuesto promedio es de ${avg} USD, lo que indica un perfil de cliente con capacidad de inversión moderada-alta. Se registraron ${stats.last7Days} nuevos leads en los últimos 7 días, reflejando actividad sostenida en los embudos.`,
+    recomendaciones: src
       ? [
-          `Intensificar la estrategia de contenido en ${focusedSource} dado su volumen de leads.`,
+          `Intensificar la estrategia de contenido en ${src} dado su volumen de leads.`,
           'Crear secuencias de seguimiento personalizadas para este canal con mensajes alineados al producto de mayor interés.',
           'Analizar la tasa de conversión específica de este canal para optimizar el ROI.',
         ]
       : [
           `Reforzar la inversión en ${fuenteLabel}, la fuente con mayor volumen de leads.`,
-          `Con un presupuesto promedio de ${avgFormatted}, enfocar ofertas en el rango de valor percibido del mercado objetivo.`,
+          `Con un presupuesto promedio de ${avg}, enfocar ofertas en el rango de valor percibido del mercado objetivo.`,
           'Implementar una secuencia de nurturing para los leads sin producto de interés definido.',
           'Revisar los leads sin presupuesto registrado para calificarlos antes de avanzar en el pipeline.',
         ],
   };
 }
 
-async function aiSummary(
-  stats: Awaited<ReturnType<typeof leadsApi.getStats>>,
-  apiKey: string,
-  fuente?: LeadSource,
-  fechaDesde?: string,
-  fechaHasta?: string,
-): Promise<SummaryResult> {
-  const res = await fetch('/api/ai-summary', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-openai-key': apiKey,
-    },
-    body: JSON.stringify({ stats, fuente, fechaDesde, fechaHasta }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error ?? `Error ${res.status}`);
-  }
-
-  const data = await res.json();
-  return { ...data, totalAnalizados: stats.total, usedAI: true };
-}
-
 export default function AiSummary() {
+  const [provider, setProvider] = useState<Provider | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [fuente, setFuente] = useState<LeadSource | undefined>();
   const [fechaDesde, setFechaDesde] = useState<Nullable<Date>>(null);
@@ -86,7 +72,17 @@ export default function AiSummary() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    setApiKey(localStorage.getItem(STORAGE_KEY) ?? '');
+    const active = localStorage.getItem(STORAGE.active) as Provider | null;
+    if (active) {
+      const key = localStorage.getItem(STORAGE[active]) ?? '';
+      if (key) {
+        setProvider(active);
+        setApiKey(key);
+        return;
+      }
+    }
+    setProvider(null);
+    setApiKey('');
   }, []);
 
   const handleGenerate = async () => {
@@ -95,15 +91,30 @@ export default function AiSummary() {
     setResult(null);
     try {
       const stats = await leadsApi.getStats();
-      if (apiKey) {
-        const summary = await aiSummary(
-          stats,
-          apiKey,
-          fuente,
-          fechaDesde?.toISOString().split('T')[0],
-          fechaHasta?.toISOString().split('T')[0],
-        );
-        setResult(summary);
+
+      if (provider && apiKey) {
+        const res = await fetch('/api/ai-summary', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-provider': provider,
+            'x-api-key': apiKey,
+          },
+          body: JSON.stringify({
+            stats,
+            fuente,
+            fechaDesde: fechaDesde?.toISOString().split('T')[0],
+            fechaHasta: fechaHasta?.toISOString().split('T')[0],
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error ?? `Error ${res.status}`);
+        }
+
+        const data = await res.json();
+        setResult({ ...data, totalAnalizados: stats.total, provider });
       } else {
         await new Promise((r) => setTimeout(r, 900));
         setResult(localSummary(stats, fuente));
@@ -115,6 +126,18 @@ export default function AiSummary() {
     }
   };
 
+  const providerTag = () => {
+    if (!provider) {
+      return (
+        <Link href="/settings">
+          <Tag severity="secondary" value="Configurar IA" icon="pi pi-cog" style={{ cursor: 'pointer' }} />
+        </Link>
+      );
+    }
+    const colors: Record<Provider, 'success' | 'warning'> = { openai: 'success', claude: 'warning' };
+    return <Tag severity={colors[provider]} value={provider === 'openai' ? 'OpenAI' : 'Claude'} icon="pi pi-check" />;
+  };
+
   return (
     <div className="card">
       <div className="flex align-items-center justify-content-between mb-1">
@@ -122,18 +145,12 @@ export default function AiSummary() {
           <i className="pi pi-sparkles text-purple-500 text-xl" />
           <h5 className="m-0">Resumen inteligente</h5>
         </div>
-        {apiKey ? (
-          <Tag severity="success" value="OpenAI conectado" icon="pi pi-check" />
-        ) : (
-          <Link href="/settings">
-            <Tag severity="secondary" value="Configurar OpenAI" icon="pi pi-cog" style={{ cursor: 'pointer' }} />
-          </Link>
-        )}
+        {providerTag()}
       </div>
       <p className="text-500 text-sm mt-1 mb-4">
-        {apiKey
-          ? 'Genera un análisis ejecutivo con gpt-4o-mini usando tus datos reales.'
-          : 'Genera un análisis local o conecta OpenAI en Configuración para usar IA real.'}
+        {provider
+          ? `Genera un análisis ejecutivo con ${PROVIDER_LABELS[provider]} usando tus datos reales.`
+          : 'Genera un análisis local o conecta un proveedor de IA en Configuración.'}
       </p>
 
       {/* Filtros */}
@@ -162,8 +179,8 @@ export default function AiSummary() {
           className="w-10rem"
         />
         <Button
-          label={apiKey ? 'Generar con IA' : 'Generar resumen'}
-          icon={apiKey ? 'pi pi-sparkles' : 'pi pi-chart-bar'}
+          label={provider ? 'Generar con IA' : 'Generar resumen'}
+          icon={provider ? 'pi pi-sparkles' : 'pi pi-chart-bar'}
           onClick={handleGenerate}
           loading={loading}
           className="p-button-outlined"
@@ -186,7 +203,7 @@ export default function AiSummary() {
       {errorMsg && !loading && (
         <div className="flex align-items-center gap-2 p-3 border-round surface-100">
           <i className="pi pi-exclamation-circle text-red-500" />
-          <span className="text-red-500">{errorMsg}</span>
+          <span className="text-red-500 text-sm">{errorMsg}</span>
         </div>
       )}
 
@@ -194,13 +211,17 @@ export default function AiSummary() {
       {result && !loading && (
         <div className="surface-50 border-round p-4">
           <div className="flex align-items-center justify-content-between mb-3">
-            <div className="flex align-items-center gap-3">
-              <span className="text-500 text-sm">Leads analizados: <strong className="text-900">{result.totalAnalizados}</strong></span>
+            <div className="flex align-items-center gap-3 flex-wrap">
+              <span className="text-500 text-sm">
+                Analizados: <strong className="text-900">{result.totalAnalizados}</strong>
+              </span>
               <span className="text-300">|</span>
-              <span className="text-500 text-sm">Fuente principal: <strong className="text-900">{result.fuentePrincipal}</strong></span>
+              <span className="text-500 text-sm">
+                Fuente principal: <strong className="text-900">{result.fuentePrincipal}</strong>
+              </span>
             </div>
-            {result.usedAI
-              ? <Tag severity="success" value="gpt-4o-mini" icon="pi pi-sparkles" />
+            {result.provider
+              ? <Tag severity={result.provider === 'openai' ? 'success' : 'warning'} value={PROVIDER_LABELS[result.provider]} icon="pi pi-sparkles" />
               : <Tag severity="secondary" value="Análisis local" />
             }
           </div>

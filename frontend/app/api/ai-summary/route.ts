@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(req: NextRequest) {
-  const apiKey = req.headers.get('x-openai-key');
-  if (!apiKey) {
-    return NextResponse.json({ error: 'API key no proporcionada' }, { status: 400 });
-  }
-
-  const body = await req.json();
-  const { stats, fuente, fechaDesde, fechaHasta } = body;
-
+function buildPrompt(stats: any, fuente?: string, fechaDesde?: string, fechaHasta?: string) {
   const fuenteFilter = fuente ? `fuente: ${fuente}` : 'todas las fuentes';
   const dateFilter =
     fechaDesde || fechaHasta
       ? `periodo: ${fechaDesde ?? 'inicio'} → ${fechaHasta ?? 'hoy'}`
       : 'todo el historial';
 
-  const prompt = `Eres un analista de marketing digital especializado en embudos de ventas para creadores digitales.
+  return `Eres un analista de marketing digital especializado en embudos de ventas para creadores digitales.
 
 Analiza los siguientes datos de leads y genera un resumen ejecutivo en español.
 
@@ -32,13 +24,12 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta (sin markdow
   "fuentePrincipal": "nombre de la fuente con mayor volumen",
   "recomendaciones": ["recomendación 1", "recomendación 2", "recomendación 3"]
 }`;
+}
 
-  const openAiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+async function callOpenAI(apiKey: string, prompt: string) {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
@@ -46,20 +37,61 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta (sin markdow
       max_tokens: 500,
     }),
   });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message ?? `Error ${res.status} de OpenAI`);
+  }
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content ?? '';
+}
 
-  if (!openAiRes.ok) {
-    const err = await openAiRes.json().catch(() => ({}));
-    const message = err?.error?.message ?? `Error ${openAiRes.status} de OpenAI`;
-    return NextResponse.json({ error: message }, { status: openAiRes.status });
+async function callClaude(apiKey: string, prompt: string) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 600,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message ?? `Error ${res.status} de Anthropic`);
+  }
+  const data = await res.json();
+  return data.content?.[0]?.text ?? '';
+}
+
+export async function POST(req: NextRequest) {
+  const provider = req.headers.get('x-provider') ?? 'openai';
+  const apiKey = req.headers.get('x-api-key');
+
+  if (!apiKey) {
+    return NextResponse.json({ error: 'API key no proporcionada' }, { status: 400 });
   }
 
-  const data = await openAiRes.json();
-  const content = data.choices?.[0]?.message?.content ?? '';
+  const { stats, fuente, fechaDesde, fechaHasta } = await req.json();
+  const prompt = buildPrompt(stats, fuente, fechaDesde, fechaHasta);
 
   try {
-    const parsed = JSON.parse(content);
+    const raw = provider === 'claude'
+      ? await callClaude(apiKey, prompt)
+      : await callOpenAI(apiKey, prompt);
+
+    // Strip possible markdown code fences before parsing
+    const clean = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    const parsed = JSON.parse(clean);
     return NextResponse.json(parsed);
-  } catch {
-    return NextResponse.json({ error: 'Respuesta inválida del modelo' }, { status: 500 });
+  } catch (e: any) {
+    const isParseError = e instanceof SyntaxError;
+    return NextResponse.json(
+      { error: isParseError ? 'Respuesta inválida del modelo' : e.message },
+      { status: isParseError ? 500 : 502 },
+    );
   }
 }
