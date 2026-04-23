@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 'use client';
 
 import { useEventListener, useUnmountEffect } from 'primereact/hooks';
@@ -25,20 +24,7 @@ const Layout = ({ children }: ChildContainerProps) => {
                 topbarRef.current?.menubutton?.contains(event.target as Node)
             );
             if (isOutsideClicked) hideMenu();
-        }
-    });
-
-    const [bindProfileMenuOutsideClickListener, unbindProfileMenuOutsideClickListener] = useEventListener({
-        type: 'click',
-        listener: (event) => {
-            const isOutsideClicked = !(
-                topbarRef.current?.topbarmenu?.isSameNode(event.target as Node) ||
-                topbarRef.current?.topbarmenu?.contains(event.target as Node) ||
-                topbarRef.current?.topbarmenubutton?.isSameNode(event.target as Node) ||
-                topbarRef.current?.topbarmenubutton?.contains(event.target as Node)
-            );
-            if (isOutsideClicked) hideProfileMenu();
-        }
+        },
     });
 
     const pathname = usePathname();
@@ -46,7 +32,6 @@ const Layout = ({ children }: ChildContainerProps) => {
 
     useEffect(() => {
         hideMenu();
-        hideProfileMenu();
     }, [pathname, searchParams]);
 
     const hideMenu = () => {
@@ -54,15 +39,10 @@ const Layout = ({ children }: ChildContainerProps) => {
             ...prev,
             overlayMenuActive: false,
             staticMenuMobileActive: false,
-            menuHoverActive: false
+            menuHoverActive: false,
         }));
         unbindMenuOutsideClickListener();
         document.body.classList.remove('blocked-scroll');
-    };
-
-    const hideProfileMenu = () => {
-        setLayoutState((prev: LayoutState) => ({ ...prev, profileSidebarVisible: false }));
-        unbindProfileMenuOutsideClickListener();
     };
 
     useEffect(() => {
@@ -74,15 +54,8 @@ const Layout = ({ children }: ChildContainerProps) => {
         }
     }, [layoutState.overlayMenuActive, layoutState.staticMenuMobileActive]);
 
-    useEffect(() => {
-        if (layoutState.profileSidebarVisible) {
-            bindProfileMenuOutsideClickListener();
-        }
-    }, [layoutState.profileSidebarVisible]);
-
     useUnmountEffect(() => {
         unbindMenuOutsideClickListener();
-        unbindProfileMenuOutsideClickListener();
     });
 
     const containerClass = classNames('layout-wrapper', {
@@ -92,7 +65,7 @@ const Layout = ({ children }: ChildContainerProps) => {
         'layout-overlay-active': layoutState.overlayMenuActive,
         'layout-mobile-active': layoutState.staticMenuMobileActive,
         'p-input-filled': layoutConfig.inputStyle === 'filled',
-        'p-ripple-disabled': !layoutConfig.ripple
+        'p-ripple-disabled': !layoutConfig.ripple,
     });
 
     return (

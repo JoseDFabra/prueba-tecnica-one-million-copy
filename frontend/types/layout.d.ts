@@ -24,7 +24,7 @@ export interface LayoutContextProps {
     layoutState: LayoutState;
     setLayoutState: Dispatch<SetStateAction<LayoutState>>;
     onMenuToggle: () => void;
-    showProfileSidebar: () => void;
+    toggleColorScheme: () => void;
 }
 
 export interface MenuContextProps {
